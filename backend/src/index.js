@@ -19,7 +19,12 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", process.env.FRONTEND_URL, "https://www.meethub.novanectar.co.in"],
+    origin: [
+      "http://localhost:5173",
+      process.env.FRONTEND_URL,
+      "https://www.meethub.novanectar.co.in",
+      "https://meethub.novanectar.co.in",
+    ],
     credentials: true,
   })
 );
