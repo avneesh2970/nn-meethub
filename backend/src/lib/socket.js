@@ -1,13 +1,16 @@
 import express from "express";
 import http from "http";
+import dotenv from "dotenv";
 import { Server } from "socket.io";
 import Meeting from "../models/meeting-model.js"
+dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: "http://localhost:5173" }, // Adjust for production
+    cors: { origin: process.env.FRONTEND_URL }, // Adjust for production
 });
+console.log("ENV URL", process.env.FRONTEND_URL);
 
 // Map to store socket IDs for users in meetings: { meetingCode: { userId: socketId } }
 const meetingSocketMap = {};
