@@ -21,7 +21,7 @@ const ScheduledMeetingCard = ({ meetings, onDelete }) => {
   return (
     <div className="self-start ml-22">
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-260">
-        {meetings.map((meeting, index) => {
+        {meetings?.map((meeting, index) => {
           return (
             <div
               key={index}
