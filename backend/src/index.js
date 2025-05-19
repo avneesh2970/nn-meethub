@@ -32,7 +32,7 @@ app.use(
 app.use("/api/auth", authRoutes);
 app.use("/api/meetings", meetingRoutes);
 
-app.get("/health-check", (req, res) => {
+app.get("/api/health-check", (req, res) => {
   res.status(200).json({ success: true, message: "backend is up and running" });
 });
 
