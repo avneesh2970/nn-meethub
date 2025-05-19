@@ -24,6 +24,8 @@ app.use(
       process.env.FRONTEND_URL,
       "https://www.meethub.novanectar.co.in",
       "https://meethub.novanectar.co.in",
+      "https://api.meethub.novanectar.co.in",
+      "http://api.meethub.novanectar.co.in",
     ],
     credentials: true,
   })
