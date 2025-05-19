@@ -20,6 +20,33 @@ const ParticipantView = ({
   // NEW: Get the local user's ID to exclude them from rendering
   const { authUser } = useAuthStore();
 
+  // CHANGE: Add cleanup for videoRefs and audioRefs when participants change
+  useEffect(() => {
+    const currentParticipantIds = Object.keys(participants);
+    Object.keys(videoRefs.current).forEach((id) => {
+      if (!currentParticipantIds.includes(id)) {
+        console.log(`Cleaning up videoRef for participant ${id}`);
+        const videoElement = videoRefs.current[id];
+        if (videoElement) {
+          videoElement.srcObject = null;
+          videoElement.pause();
+        }
+        delete videoRefs.current[id];
+      }
+    });
+    Object.keys(audioRefs.current).forEach((id) => {
+      if (!currentParticipantIds.includes(id)) {
+        console.log(`Cleaning up audioRef for participant ${id}`);
+        const audioElement = audioRefs.current[id];
+        if (audioElement) {
+          audioElement.srcObject = null;
+          audioElement.pause();
+        }
+        delete audioRefs.current[id];
+      }
+    });
+  }, [participants]);
+
   // Assign streams to video elements when streams change
   useEffect(() => {
     Object.entries(participants).forEach(([id, participant]) => {
@@ -98,53 +125,58 @@ const ParticipantView = ({
     <>
       {/* Sidebar for Mobile */}
       {selected === "Sidebar" && (
-        <div className="absolute bottom-4 right-4 w-[34%] h-[30%] bg-gray-800 rounded-lg overflow-hidden lg:hidden">
+        <div className="absolute bottom-4 right-4 w-[34%] h-[30%] rounded-lg overflow-hidden lg:hidden">
           {Object.entries(participants)
             .filter(([id]) => id !== authUser?._id)
-            .map(([id, participant]) => (
-              <div key={id} className="relative w-full h-full">
-                {participant?.video ? (
-                  <video
-                    ref={(video) => {
-                      if (video) {
-                        videoRefs.current[id] = video;
+            .map(([id, participant]) => {
+              return (
+                <div
+                  key={id}
+                  className="relative w-full h-full overflow-hidden"
+                >
+                  {streams[id]?.video ? (
+                    <video
+                      ref={(video) => {
+                        if (video) {
+                          videoRefs.current[id] = video;
+                        }
+                      }}
+                      autoPlay
+                      muted
+                      className="w-full h-full object-cover transform scale-x-[-1]"
+                    ></video>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-800 text-white text-4xl font-semibold rounded-md">
+                      {participant.name[0].toUpperCase()}
+                    </div>
+                  )}
+                  {/* AUDIO CHANGE: Add audio element for each participant */}
+                  <audio
+                    ref={(audio) => {
+                      if (audio) {
+                        audioRefs.current[id] = audio;
                       }
                     }}
                     autoPlay
-                    muted
-                    className="w-full h-full object-cover transform scale-x-[-1]"
-                  ></video>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-800 text-white text-4xl font-semibold rounded-md">
-                    {participant.name[0].toUpperCase()}
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center">
+                    <span className="text-sm font-semibold text-white">
+                      {participant.name}
+                    </span>
+                    <button
+                      className="text-xs bg-gray-700 text-white px-2 py-1 rounded"
+                      onClick={() => toggleParticipantMic(id)}
+                    >
+                      {participant.mic ? (
+                        <FaMicrophone />
+                      ) : (
+                        <PiMicrophoneSlashLight />
+                      )}
+                    </button>
                   </div>
-                )}
-                {/* AUDIO CHANGE: Add audio element for each participant */}
-                <audio
-                  ref={(audio) => {
-                    if (audio) {
-                      audioRefs.current[id] = audio;
-                    }
-                  }}
-                  autoPlay
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center">
-                  <span className="text-sm font-semibold text-white">
-                    {participant.name}
-                  </span>
-                  <button
-                    className="text-xs bg-gray-700 text-white px-2 py-1 rounded"
-                    onClick={() => toggleParticipantMic(id)}
-                  >
-                    {participant.mic ? (
-                      <FaMicrophone />
-                    ) : (
-                      <PiMicrophoneSlashLight />
-                    )}
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
       )}
 

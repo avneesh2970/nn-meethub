@@ -20,6 +20,7 @@ import { useMeetingStore } from "../store/useMeetingStore";
 const MeetingLive = () => {
   const { socket, authUser } = useAuthStore();
   const [copied, setCopied] = useState(false);
+  const [hasNewMessage, setHasNewMessage] = useState(false);
 
   const navigate = useNavigate();
   const {
@@ -60,6 +61,8 @@ const MeetingLive = () => {
   const [isScreenSharing, setIsScreenSharing] = useState(false); // Add state for screen sharing
   const [isMicOn, setIsMicOn] = useState(true); // Default to true to match getUserMedia
   const [isVideoOn, setIsVideoOn] = useState(true);
+  const HostId = selectedMeeting?.host;
+  const isHost = authUser._id === HostId;
 
   const layouts = [
     { name: "Auto", img: Frame1 },
@@ -180,13 +183,59 @@ const MeetingLive = () => {
       setToggleStates((prev) => ({ ...prev, [newTool]: newState }));
     });
 
+    socket.on("disableMedia", (data) => {
+      const { mediaType } = data;
+      console.log("DISABLE MEDIA:", mediaType);
+      console.log("isHost:", isHost);
+      if (isHost) {
+        return;
+      }
+      console.log("MIC ON:", isMicOn);
+      console.log("VIDEO ON:", isVideoOn);
+      console.log("SCREEN SHARING:", isScreenSharing);
+      console.log("CHAT OPEN:", isChatOpen);
+      if (mediaType === "video" && isVideoOn) {
+        console.log("DISABLE VIDEO");
+        toggleCamera();
+      }
+      if (mediaType === "mic" && isMicOn) {
+        console.log("DISABLE MIC");
+        toggleMic();
+      }
+      if (mediaType === "Share Screen" && isScreenSharing) {
+        console.log("DISABLE SCREEN SHARE");
+        stopScreenShare();
+      }
+      if (mediaType === "Chat" && isChatOpen) {
+        console.log("DISABLE CHAT");
+        toggleChat();
+      }
+    });
+
+    socket.on("activeScreenSharer", ({ userId }) => {
+      console.log("ACTIVE SCREEN SHARER UPDATE:", userId);
+      setActiveScreenSharer(userId);
+    });
+
     return () => {
       socket.off("init");
       socket.off("participantUpdate");
       socket.off("updateLayout");
       socket.off("updateHostTools");
+      socket.off("disableMedia");
+      socket.off("activeScreenSharer");
     };
-  }, [socket, setParticipants, setMyStatus, toggleStates]);
+  }, [
+    socket,
+    setParticipants,
+    setMyStatus,
+    toggleStates,
+    isMicOn,
+    isVideoOn,
+    isScreenSharing,
+    isChatOpen,
+    setActiveScreenSharer,
+  ]);
 
   useEffect(() => {
     if (
@@ -344,8 +393,6 @@ const MeetingLive = () => {
   };
 
   const handleToggle = (tool) => {
-    const HostId = selectedMeeting.host;
-    const isHost = authUser._id === HostId;
     if (!isHost) {
       toast.error("Only the host can change this setting.");
       return;
@@ -397,8 +444,8 @@ const MeetingLive = () => {
       });
       setIsScreenSharing(true); // Set screen sharing state to true
       setScreenStream(newScreenStream);
-      //setActiveScreenSharer(authUser._id); // Set the active screen sharer
       const userId = authUser._id;
+      setActiveScreenSharer(userId);
       socket.emit("activeScreenSharer", { userId }); // Notify others about the active screen sharer
 
       // Add screen stream to useMeetingStore
@@ -499,6 +546,9 @@ const MeetingLive = () => {
 
   const handleSignOut = async () => {
     try {
+      if (screenStream) {
+        screenStream.getTracks().forEach((track) => track.stop());
+      }
       if (localStream) {
         localStream.getTracks().forEach((track) => track.stop());
       }
@@ -639,6 +689,7 @@ const MeetingLive = () => {
             setIsChatOpen={setIsChatOpen}
             socket={socket}
             selected={selected}
+            setHasNewMessage={setHasNewMessage}
           />
           {/* People Section */}
           <PeopleSection
@@ -665,6 +716,9 @@ const MeetingLive = () => {
           isScreenSharing={isScreenSharing}
           waitingToJoin={waitingToJoin}
           openLeaveModal={() => setIsLeaveModalOpen(true)} // Correctly pass function to open LeaveModal
+          isHost={isHost}
+          toggleStates={toggleStates}
+          hasNewMessage={hasNewMessage}
         />
       </div>
 

@@ -163,7 +163,14 @@ io.on("connection", (socket) => {
                 let backendTool = tool;
 
                 if (tool === "Share Screen") {
+                    io.to(meetingCode).emit("disableMedia", { mediaType: "Share Screen" });
                     backendTool = "ScreenShare";
+                } else if (tool === "Unmute") {
+                    io.to(meetingCode).emit("disableMedia", { mediaType: "mic" });
+                } else if (tool === "Video") {
+                    io.to(meetingCode).emit("disableMedia", { mediaType: "video" });
+                } else if (tool === "Chat") {
+                    io.to(meetingCode).emit("disableMedia", { mediaType: "Chat" });
                 }
                 meeting.settings[backendTool] = !meeting.settings[backendTool];
                 await meeting.save();

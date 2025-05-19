@@ -3,7 +3,13 @@ import { X } from "lucide-react";
 import { FaPaperPlane } from "react-icons/fa";
 import { useAuthStore } from "../store/useAuthStore";
 
-const ChatSection = ({ isChatOpen, setIsChatOpen, socket, selected }) => {
+const ChatSection = ({
+  isChatOpen,
+  setIsChatOpen,
+  socket,
+  selected,
+  setHasNewMessage,
+}) => {
   const chatContainerRef = useRef(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -15,18 +21,34 @@ const ChatSection = ({ isChatOpen, setIsChatOpen, socket, selected }) => {
     socket.on("newMessage", (message) => {
       console.log("newMessage received:", message); // Debug
       setMessages((prev) => [...prev, message]);
+      if (!isChatOpen || isScrolledUp) {
+        setHasNewMessage(true);
+      }
     });
 
     return () => {
       socket.off("newMessage");
     };
-  }, [socket]);
+  }, [socket, isChatOpen, isScrolledUp, setHasNewMessage]);
+
+  useEffect(() => {
+    // Reset new message alert when chat is opened
+    if (isChatOpen) {
+      setHasNewMessage(false);
+      scrollToBottom();
+    }
+  }, [isChatOpen, setHasNewMessage]);
 
   const handleScroll = () => {
     if (chatContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } =
         chatContainerRef.current;
-      setIsScrolledUp(scrollTop + clientHeight < scrollHeight - 10);
+      const atBottom = scrollTop + clientHeight < scrollHeight - 10;
+      setIsScrolledUp(atBottom);
+
+      if (atBottom) {
+        setHasNewMessage(false);
+      }
     }
   };
 
