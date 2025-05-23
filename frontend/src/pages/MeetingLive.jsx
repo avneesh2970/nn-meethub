@@ -219,7 +219,6 @@ const MeetingLive = () => {
 
     return () => {
       socket.off("init");
-      socket.off("participantUpdate");
       socket.off("updateLayout");
       socket.off("updateHostTools");
       socket.off("disableMedia");
