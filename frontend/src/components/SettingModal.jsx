@@ -57,11 +57,12 @@ const SettingModal = ({
   const [videoDevices, setVideoDevices] = useState([]);
   const [audioInputDevices, setAudioInputDevices] = useState([]);
   const [audioOutputDevices, setAudioOutputDevices] = useState([]);
-  const [micVolume, setMicVolume] = useState(50);
+  const [audioLevel, setAudioLevel] = useState(0);
   const [isTestingSpeaker, setIsTestingSpeaker] = useState(false);
 
   const audioContextRef = useRef(null);
-  const gainNodeRef = useRef(null);
+  const analyserRef = useRef(null);
+  const animationFrameRef = useRef(null);
 
   useEffect(() => {
     const enumerateDevices = async () => {
@@ -104,6 +105,9 @@ const SettingModal = ({
       if (audioContextRef.current) {
         audioContextRef.current.close();
       }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
   }, [
     isModalOpen,
@@ -117,10 +121,10 @@ const SettingModal = ({
   ]);
 
   useEffect(() => {
-    const setupMic = () => {
+    const setupMicVisualizer = () => {
       const stream = streams[authUser._id]?.video;
       if (!stream || stream.getAudioTracks().length === 0) {
-        console.warn("No audio stream available for mic volume adjustment");
+        console.warn("No audio stream available for visualizer");
         return;
       }
 
@@ -128,17 +132,40 @@ const SettingModal = ({
         audioContextRef.current = new (window.AudioContext ||
           window.webkitAudioContext)();
         const source = audioContextRef.current.createMediaStreamSource(stream);
-        gainNodeRef.current = audioContextRef.current.createGain();
-        source.connect(gainNodeRef.current);
-        // Note: Not connecting to destination to avoid feedback; gain is for WebRTC stream
-        gainNodeRef.current.gain.value = micVolume / 100;
 
-        console.log(
-          "Mic gain setup with WebRTC stream for user:",
-          authUser._id
-        );
+        // Create AnalyserNode for audio visualization
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 256; // Smaller FFT size for faster response
+        source.connect(analyserRef.current);
+
+        const bufferLength = analyserRef.current.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        // Function to calculate audio level and update state
+        const updateAudioLevel = () => {
+          analyserRef.current.getByteFrequencyData(dataArray);
+
+          // Calculate average frequency (RMS-like approximation)
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / bufferLength;
+
+          // Map the average (0-255) to a percentage (0-100)
+          const level = Math.min((average / 255) * 100, 100);
+          setAudioLevel(level);
+
+          // Continue animation
+          animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
+        };
+
+        // Start the visualization loop
+        updateAudioLevel();
+
+        console.log("Audio visualizer setup for user:", authUser._id);
       } catch (error) {
-        console.error("Error setting up microphone gain:", error);
+        console.error("Error setting up audio visualizer:", error);
       }
     };
 
@@ -147,67 +174,18 @@ const SettingModal = ({
       activeItem === "Device Settings" &&
       streams[authUser._id]?.video
     ) {
-      setupMic();
+      setupMicVisualizer();
     }
 
     return () => {
       if (audioContextRef.current) {
         audioContextRef.current.close();
       }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
   }, [isModalOpen, activeItem, streams, authUser._id]);
-
-  /* useEffect(() => {
-    const setupMic = async () => {
-      if (!selectedMicDevice) return;
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { deviceId: selectedMicDevice },
-        });
-        micStreamRef.current = stream;
-
-        audioContextRef.current = new (window.AudioContext ||
-          window.webkitAudioContext)();
-        const source = audioContextRef.current.createMediaStreamSource(stream);
-        gainNodeRef.current = audioContextRef.current.createGain();
-        source.connect(gainNodeRef.current);
-        gainNodeRef.current.connect(audioContextRef.current.destination);
-        gainNodeRef.current.gain.value = micVolume / 100;
-
-        console.log("Mic setup with device:", selectedMicDevice);
-      } catch (error) {
-        console.error("Error setting up microphone:", error);
-      }
-    };
-
-    if (isModalOpen && activeItem === "Device Settings") {
-      setupMic();
-    }
-  }, [selectedMicDevice, isModalOpen, activeItem]);*/
-
-  /* useEffect(() => {
-    if (gainNodeRef.current) {
-      gainNodeRef.current.gain.value = micVolume / 100;
-      console.log("Mic volume updated:", micVolume);
-    }
-  }, [micVolume]);*/
-
-  useEffect(() => {
-    if (gainNodeRef.current) {
-      gainNodeRef.current.gain.value = micVolume / 100;
-      console.log("Mic volume updated:", micVolume);
-
-      // Apply gain to the WebRTC stream's audio track
-      const stream = streams[authUser._id]?.video;
-      if (stream && stream.getAudioTracks().length > 0) {
-        const audioTrack = stream.getAudioTracks()[0];
-        // Note: WebRTC doesn't directly support gain adjustment; this is a placeholder
-        // If using a library like WebRTC-adapter, you may need to adjust the track's gain differently
-        console.log("Applied gain to WebRTC stream audio track (placeholder)");
-      }
-    }
-  }, [micVolume, streams, authUser._id]);
 
   const handleVideoDeviceChange = async (deviceId) => {
     setSelectedVideoDevice(deviceId);
@@ -437,15 +415,12 @@ const SettingModal = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <IoMicOutline size={20} />
-                  <input
-                    type="range"
-                    className="flex-1"
-                    min="0"
-                    max="100"
-                    value={micVolume}
-                    onChange={(e) => setMicVolume(Number(e.target.value))}
-                  />
-                  <span className="text-sm text-gray-400">{micVolume}%</span>
+                  <div className="flex-1 h-4 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-500 transition-all duration-50"
+                      style={{ width: `${audioLevel}%` }}
+                    ></div>
+                  </div>
                 </div>
               </div>
               <div>
