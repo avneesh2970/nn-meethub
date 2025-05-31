@@ -32,19 +32,7 @@ export const useMeetingStore = create((set, get) => ({
     renegotiationQueue: {}, // New: Queue for pending re-negotiations
     pendingOffers: {}, // New: Queue for pending offers
     activeScreenSharer: null,
-    /*setActiveScreenSharer: (userId) => {
-        console.log("setActiveScreenSharer called with userId:", userId);
-        const activeSharer = get().activeScreenSharer;
-        const currentUserId = useAuthStore.getState().authUser?._id;
-        const socket = useAuthStore.getState().socket;
-        if (activeSharer && activeSharer !== currentUserId) {
-            toast.error("Someone else is already sharing their screen");
-            return;
-        }
-        set({ activeScreenSharer: userId });
-        socket.emit("ActiveScreenSharer", { userId });
-        console.log("Active screen sharer set to:", activeSharer);
-    },*/
+
     setActiveScreenSharer: (userId) => {
         set({ activeScreenSharer: userId });
     },
@@ -467,11 +455,9 @@ export const useMeetingStore = create((set, get) => ({
         }
     },
 
-    //CHANGE 08/10/2023
-
-    switchDevice: async (deviceType, deviceId) => {
+    switchDevice: async (deviceType, deviceId, onStreamUpdated) => {
         const authUserId = useAuthStore.getState().authUser?._id;
-        const { streams, peerConnections } = get();
+        const { streams, peerConnections, participants } = get();
 
         if (!authUserId) {
             console.error("No auth user ID found for switching device");
@@ -482,54 +468,152 @@ export const useMeetingStore = create((set, get) => ({
             let newStream;
             const currentStream = streams[authUserId]?.video || new MediaStream();
 
-            if (deviceType === "video") {
-                // Stop existing video tracks
-                currentStream.getVideoTracks().forEach(track => track.stop());
+            // Stop all tracks in the current stream to prevent conflicts
+            currentStream.getTracks().forEach(track => {
+                track.stop();
+                console.log(`Stopped ${track.kind} track in current stream`);
+            });
 
-                // Fetch new video stream
+            if (deviceType === "video") {
+                // CHANGE: Check mic state to determine if audio should be included
+                const micEnabled = participants[authUserId]?.mic ?? false;
+                //const audioDeviceId = currentStream.getAudioTracks()[0]?.getSettings().deviceId;
+
                 newStream = await navigator.mediaDevices.getUserMedia({
                     video: { deviceId: deviceId },
-                    audio: currentStream.getAudioTracks().length > 0 // Keep audio constraints
-                        ? { deviceId: currentStream.getAudioTracks()[0].getSettings().deviceId }
-                        : false,
+                    audio: micEnabled ? true : false,
                 });
 
                 console.log(`Switched video device for ${authUserId} to ${deviceId}`);
-            } else if (deviceType === "audio") {
-                // Stop existing audio tracks
-                currentStream.getAudioTracks().forEach(track => track.stop());
 
-                // Fetch new audio stream
-                const audioStream = await navigator.mediaDevices.getUserMedia({
+                // Ensure audio track is enabled if mic is supposed to be on
+                const newAudioTrack = newStream.getAudioTracks()[0];
+                if (newAudioTrack && micEnabled) {
+                    newAudioTrack.enabled = true;
+                    console.log(`Ensured audio track is enabled after camera switch`);
+                }
+
+                const newVideoTrack = newStream.getVideoTracks()[0];
+                let replaceTrackSuccess = true;
+
+                for (const participantId of Object.keys(peerConnections)) {
+                    const peerConnection = peerConnections[participantId];
+                    if (!peerConnection) continue;
+
+                    try {
+                        const senders = peerConnection.getSenders();
+                        const videoSender = senders.find(sender => sender.track?.kind === 'video');
+                        const audioSender = senders.find(sender => sender.track?.kind === 'audio');
+
+                        if (videoSender && newVideoTrack) {
+                            await videoSender.replaceTrack(newVideoTrack);
+                            console.log(`Successfully replaced video track for ${participantId}`);
+                        } else {
+                            console.warn(`No video sender found for ${participantId}, falling back to renegotiation`);
+                            replaceTrackSuccess = false;
+                            get().queueRenegotiation(participantId);
+                        }
+
+                        if (audioSender && newAudioTrack && micEnabled) {
+                            await audioSender.replaceTrack(newAudioTrack);
+                            console.log(`Successfully replaced audio track for ${participantId}`);
+                        } else if (micEnabled && !audioSender) {
+                            console.warn(`No audio sender found for ${participantId}, falling back to renegotiation`);
+                            replaceTrackSuccess = false;
+                            get().queueRenegotiation(participantId);
+                        }
+                    } catch (error) {
+                        console.error(`Error replacing video track for ${participantId}:`, error);
+                        replaceTrackSuccess = false;
+                        get().queueRenegotiation(participantId);
+                    }
+                }
+
+                if (replaceTrackSuccess) {
+                    console.log("All video tracks replaced successfully, no renegotiation needed");
+                }
+            } else if (deviceType === "audio") {
+                // CHANGE: Request a new stream with both video and audio to ensure tracks are fresh
+                const videoDeviceId = currentStream.getVideoTracks()[0]?.getSettings().deviceId;
+
+                newStream = await navigator.mediaDevices.getUserMedia({
+                    video: videoDeviceId ? { deviceId: videoDeviceId } : false,
                     audio: { deviceId: deviceId },
                 });
 
-                // Merge new audio track with existing video tracks
-                newStream = new MediaStream();
-                currentStream.getVideoTracks().forEach(track => newStream.addTrack(track));
-                audioStream.getTracks().forEach(track => newStream.addTrack(track));
-
                 console.log(`Switched audio device for ${authUserId} to ${deviceId}`);
+
+                // Ensure audio and video tracks are enabled based on participant state
+                const micEnabled = participants[authUserId]?.mic ?? false;
+                const videoEnabled = participants[authUserId]?.video ?? false;
+
+                const newAudioTrack = newStream.getAudioTracks()[0];
+                if (newAudioTrack) {
+                    newAudioTrack.enabled = micEnabled;
+                    console.log(`Set audio track enabled state to ${micEnabled} after audio device switch`);
+                }
+
+                const newVideoTrack = newStream.getVideoTracks()[0];
+                if (newVideoTrack) {
+                    newVideoTrack.enabled = videoEnabled;
+                    console.log(`Set video track enabled state to ${videoEnabled} after audio device switch`);
+                }
+
+                // Replace tracks for all peers
+                let replaceTrackSuccess = true;
+                for (const participantId of Object.keys(peerConnections)) {
+                    const peerConnection = peerConnections[participantId];
+                    if (!peerConnection) continue;
+
+                    try {
+                        const senders = peerConnection.getSenders();
+                        const videoSender = senders.find(sender => sender.track?.kind === 'video');
+                        const audioSender = senders.find(sender => sender.track?.kind === 'audio');
+
+                        if (videoSender && newVideoTrack) {
+                            await videoSender.replaceTrack(newVideoTrack);
+                            console.log(`Successfully replaced video track for ${participantId}`);
+                        }
+                        if (audioSender && newAudioTrack) {
+                            await audioSender.replaceTrack(newAudioTrack);
+                            console.log(`Successfully replaced audio track for ${participantId}`);
+                        }
+
+                        if (!videoSender || !audioSender) {
+                            console.warn(`Missing sender for ${participantId}, falling back to renegotiation`);
+                            replaceTrackSuccess = false;
+                            get().queueRenegotiation(participantId);
+                        }
+                    } catch (error) {
+                        console.error(`Error replacing tracks for ${participantId}:`, error);
+                        replaceTrackSuccess = false;
+                        get().queueRenegotiation(participantId);
+                    }
+                }
+
+                if (replaceTrackSuccess) {
+                    console.log("All tracks replaced successfully, no renegotiation needed");
+                }
             } else {
                 throw new Error("Invalid device type");
             }
 
-            // Update local stream
+            // Update local stream in the store
             get().setLocalStream(authUserId, newStream);
 
-            // Trigger renegotiation for all participants
-            Object.keys(peerConnections).forEach(participantId => {
-                console.log(`Queuing renegotiation for ${participantId} due to device switch`);
-                get().queueRenegotiation(participantId);
-            });
+            // Call the callback to update the videoRef in MeetingLive.jsx
+            if (onStreamUpdated && typeof onStreamUpdated === 'function') {
+                onStreamUpdated(newStream);
+            }
 
-            return newStream; // Return the new stream for local preview update
+            return newStream;
         } catch (error) {
             console.error(`Error switching ${deviceType} device:`, error);
             toast.error(`Failed to switch ${deviceType} device`);
             return null;
         }
     },
+
 
     // Handle an incoming offer and send an answer
     handleOffer: async (data) => {
@@ -573,9 +657,6 @@ export const useMeetingStore = create((set, get) => ({
                 get().queueOffer(data);
                 return;
             }
-            /*console.log(`Queuing offer from ${from}, current state: ${peerConnection.signalingState}`);
-            get().queueOffer(data);
-            return;*/
         }
 
         try {
@@ -1171,7 +1252,7 @@ export const useMeetingStore = create((set, get) => ({
             toast(`${name} reacted with: ${emoji}`);
         });
 
-        socket.on("streamUpdate", ({ userId, mic, video, screenSharing }) => {
+        socket.on("streamUpdate", async ({ userId, mic, video, screenSharing }) => {
             console.log("streamUpdate received:", { userId, mic, video, screenSharing });
 
 
@@ -1179,12 +1260,46 @@ export const useMeetingStore = create((set, get) => ({
             const newParticipants = get().participants;
 
             if (mic !== undefined && newStreams[userId]?.video) {
-                const audioTrack = newStreams[userId].video.getAudioTracks()[0];
-                if (audioTrack) {
+                let audioTrack = newStreams[userId].video.getAudioTracks()[0];
+                /*if (audioTrack) {
                     audioTrack.enabled = mic;
+                }*/
+                if (!audioTrack && mic) {
+                    // Audio track is missing but mic should be on, re-request audio
+                    try {
+                        const audioStream = await navigator.mediaDevices.getUserMedia({
+                            audio: true,
+                        });
+                        audioTrack = audioStream.getAudioTracks()[0];
+                        newStreams[userId].video.addTrack(audioTrack);
+                        audioTrack.enabled = mic;
+                        console.log(`Recovered audio track for ${userId} and set enabled=${mic}`);
+
+                        // Update peer connections with the new audio track
+                        for (const participantId of Object.keys(get().peerConnections)) {
+                            const peerConnection = get().peerConnections[participantId];
+                            if (!peerConnection) continue;
+
+                            const audioSender = peerConnection.getSenders().find(sender => sender.track?.kind === 'audio');
+                            if (audioSender) {
+                                await audioSender.replaceTrack(audioTrack);
+                                console.log(`Replaced audio track for ${participantId}`);
+                            } else {
+                                get().queueRenegotiation(participantId);
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Error recovering audio track for ${userId}:`, error);
+                    }
+                } else if (audioTrack) {
+                    audioTrack.enabled = mic;
+                    console.log(`Toggled audio track for ${userId} to enabled=${mic}`);
+                } else {
+                    console.warn(`No audio track found for ${userId} and mic is off`);
                 }
                 newParticipants[userId] = { ...newParticipants[userId], mic };
             }
+
 
             if (video !== undefined && newStreams[userId]?.video) {
                 const videoTrack = newStreams[userId].video.getVideoTracks()[0];

@@ -38,7 +38,6 @@ const SettingModal = ({
   toggleStates,
   handleToggle,
   switchDevice, // New prop to call useMeetingStore.switchDevice
-  onStreamUpdate,
 }) => {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true); // State to toggle sidebar visibility on mobile
   const modalContentRef = useRef(null);
@@ -187,7 +186,7 @@ const SettingModal = ({
     };
   }, [isModalOpen, activeItem, streams, authUser._id]);
 
-  const handleVideoDeviceChange = async (deviceId) => {
+  /* const handleVideoDeviceChange = async (deviceId) => {
     setSelectedVideoDevice(deviceId);
     if (switchDevice) {
       try {
@@ -199,16 +198,24 @@ const SettingModal = ({
         console.error("Error switching video device:", err);
       }
     }
+  };*/
+  const handleVideoDeviceChange = async (deviceId) => {
+    setSelectedVideoDevice(deviceId);
+    if (switchDevice) {
+      try {
+        await switchDevice("video", deviceId);
+        // Removed onStreamUpdate(newStream) since preview isn't needed
+      } catch (err) {
+        console.error("Error switching video device:", err);
+      }
+    }
   };
 
   const handleMicDeviceChange = async (deviceId) => {
     setSelectedMicDevice(deviceId);
     if (switchDevice) {
       try {
-        const newStream = await switchDevice("audio", deviceId);
-        if (newStream && onStreamUpdate) {
-          onStreamUpdate(newStream);
-        }
+        await switchDevice("audio", deviceId);
       } catch (err) {
         console.error("Error switching audio device:", err);
       }
@@ -246,10 +253,9 @@ const SettingModal = ({
       modalContentRef.current &&
       !modalContentRef.current.contains(e.target)
     ) {
-      console.log("Clicked outside modal - closing");
       closeSidebar();
     } else {
-      console.log("Clicked inside modal - staying open");
+      e.stopPropagation();
     }
   };
 

@@ -39,6 +39,7 @@ const MeetingLive = () => {
     renegotiatePeerConnection,
     count,
     setCount,
+    switchDevice,
   } = useMeetingStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -70,17 +71,6 @@ const MeetingLive = () => {
     { name: "Spotlight", img: Frame3 },
     { name: "Tiled", img: Frame4 },
   ];
-
-  {
-    /*useEffect(() => {
-    const code = window.location.pathname.split("/")[2];
-    const { meetingCode, myStatus } = useMeetingStore.getState();
-    if (code && !meetingCode && myStatus !== "joined") {
-      console.log("Attempting to join meeting from route:", code);
-      joinMeeting(code);
-    }
-  }, [joinMeeting]);*/
-  }
 
   useEffect(() => {
     if (myStatus === "joined" && !localStream) {
@@ -398,6 +388,21 @@ const MeetingLive = () => {
     }
 
     socket.emit("updateHostTools", { tool });
+  };
+
+  // Callback to update videoRef after device switch
+  const handleStreamUpdated = (newStream) => {
+    if (videoRef.current) {
+      // Stop old tracks to prevent conflicts
+      if (videoRef.current.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+      }
+      setLocalStream(newStream);
+      videoRef.current.srcObject = newStream;
+      videoRef.current.play().catch((err) => {
+        console.error("Error playing local video after device switch:", err);
+      });
+    }
   };
 
   const toggleMic = () => {
@@ -733,6 +738,9 @@ const MeetingLive = () => {
         tools={tools}
         toggleStates={toggleStates}
         handleToggle={handleToggle}
+        switchDevice={(deviceType, deviceId) =>
+          switchDevice(deviceType, deviceId, handleStreamUpdated)
+        }
       />
 
       <LeaveModal
