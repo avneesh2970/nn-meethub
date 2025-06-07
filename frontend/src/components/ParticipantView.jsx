@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { PiMicrophoneSlashLight } from "react-icons/pi";
 import { FaMicrophone } from "react-icons/fa";
 import { useMeetingStore } from "../store/useMeetingStore";
@@ -121,80 +121,42 @@ const ParticipantView = ({
     });
   }, [participants, streams]);
 
+  // Filter participants excluding the local user
+  const filteredParticipants = Object.entries(participants).filter(
+    ([id]) => id !== authUser?._id
+  );
+
+  // Limit the number of participants shown in the sidebar
+  const MAX_SIDEBAR_PARTICIPANTS_DESKTOP = 3;
+  const MAX_SIDEBAR_PARTICIPANTS_MOBILE = 1;
+  const desktopVisibleParticipants = filteredParticipants.slice(
+    0,
+    MAX_SIDEBAR_PARTICIPANTS_DESKTOP
+  );
+  const mobileVisibleParticipants = filteredParticipants.slice(
+    0,
+    MAX_SIDEBAR_PARTICIPANTS_MOBILE
+  );
+  const remainingParticipantsDesktop =
+    filteredParticipants.length - MAX_SIDEBAR_PARTICIPANTS_DESKTOP;
+  const remainingParticipantsMobile =
+    filteredParticipants.length - MAX_SIDEBAR_PARTICIPANTS_MOBILE;
+
+  const showPlusXMobile = remainingParticipantsMobile > 0;
+  let mobileVideoWidthClass = showPlusXMobile ? "w-[34%]" : "w-[68%]";
+
   return (
     <>
       {/* Sidebar for Mobile */}
       {selected === "Sidebar" && (
-        <div className="absolute bottom-4 right-4 w-[34%] h-[30%] rounded-lg overflow-hidden lg:hidden">
-          {Object.entries(participants)
-            .filter(([id]) => id !== authUser?._id)
-            .map(([id, participant]) => {
-              return (
-                <div
-                  key={id}
-                  className="relative w-full h-full overflow-hidden"
-                >
-                  {streams[id]?.video ? (
-                    <video
-                      ref={(video) => {
-                        if (video) {
-                          videoRefs.current[id] = video;
-                        }
-                      }}
-                      autoPlay
-                      muted
-                      className="w-full h-full object-cover transform scale-x-[-1]"
-                    ></video>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-800 text-white text-4xl font-semibold rounded-md">
-                      {participant.name[0].toUpperCase()}
-                    </div>
-                  )}
-                  {/* AUDIO CHANGE: Add audio element for each participant */}
-                  <audio
-                    ref={(audio) => {
-                      if (audio) {
-                        audioRefs.current[id] = audio;
-                      }
-                    }}
-                    autoPlay
-                  />
-                  <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center">
-                    <span className="text-sm font-semibold text-white">
-                      {participant.name}
-                    </span>
-                    <button
-                      className="text-xs bg-gray-700 text-white px-2 py-1 rounded"
-                      onClick={() => toggleParticipantMic(id)}
-                    >
-                      {participant.mic ? (
-                        <FaMicrophone />
-                      ) : (
-                        <PiMicrophoneSlashLight />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      )}
-
-      {/* Sidebar for Desktop */}
-      {selected === "Sidebar" && (
-        <div
-          className={`absolute hidden  lg:flex flex-col w-[20%] text-white p-4 overflow-y-auto gap-4 transition-all duration-300 ${
-            isChatOpen || isPeopleOpen ? "left-[60%]" : "left-[80%]"
-          }`}
-        >
-          {Object.entries(participants)
-            .filter(([id]) => id !== authUser?._id)
-            .map(([id, participant]) => (
+        <div className="absolute bottom-4 right-0 pr-1 flex gap-2 lg:hidden max-w-[calc(100%-1rem)]">
+          {mobileVisibleParticipants.map(([id, participant]) => {
+            return (
               <div
                 key={id}
-                className="relative bg-gray-800 rounded-lg overflow-hidden"
+                className={`relative ${mobileVideoWidthClass} h-[22vh] aspect-video rounded-lg overflow-hidden1`}
               >
-                {participant?.video ? (
+                {streams[id]?.video ? (
                   <video
                     ref={(video) => {
                       if (video) {
@@ -203,10 +165,10 @@ const ParticipantView = ({
                     }}
                     autoPlay
                     muted
-                    className="w-full h-32 object-cover transform scale-x-[-1]"
+                    className="w-full h-full object-cover transform scale-x-[-1]"
                   ></video>
                 ) : (
-                  <div className="w-full h-32 flex items-center justify-center bg-gray-800 text-white text-4xl font-semibold rounded-md">
+                  <div className="w-full h-full flex items-center justify-center bg-gray-800 text-white text-4xl font-semibold rounded-md">
                     {participant.name[0].toUpperCase()}
                   </div>
                 )}
@@ -220,11 +182,11 @@ const ParticipantView = ({
                   autoPlay
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center">
-                  <span className="text-sm font-semibold">
+                  <span className="text-sm font-semibold text-white">
                     {participant.name}
                   </span>
                   <button
-                    className="text-xs bg-gray-700 text-white px-2 py-1 rounded hover:bg-gray-600 transition"
+                    className="text-xs bg-gray-700 text-white px-2 py-1 rounded"
                     onClick={() => toggleParticipantMic(id)}
                   >
                     {participant.mic ? (
@@ -235,7 +197,77 @@ const ParticipantView = ({
                   </button>
                 </div>
               </div>
-            ))}
+            );
+          })}
+          {/* +X Indicator for Mobile */}
+          {remainingParticipantsMobile > 0 && (
+            <div className="w-[34%] h-[20vh] aspect-video flex items-center justify-center bg-gray-800 rounded-lg text-white text-4xl font-semibold cursor-pointer hover:bg-gray-700 transition">
+              {`+${remainingParticipantsMobile}`}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sidebar for Desktop */}
+      {selected === "Sidebar" && (
+        <div
+          className={`absolute hidden  lg:flex flex-col w-[20%] text-white p-4 overflow-y-auto gap-4 transition-all duration-300 ${
+            isChatOpen || isPeopleOpen ? "left-[60%]" : "left-[80%]"
+          }`}
+        >
+          {desktopVisibleParticipants.map(([id, participant]) => (
+            <div
+              key={id}
+              className="relative bg-gray-800 rounded-lg overflow-hidden"
+            >
+              {participant?.video ? (
+                <video
+                  ref={(video) => {
+                    if (video) {
+                      videoRefs.current[id] = video;
+                    }
+                  }}
+                  autoPlay
+                  muted
+                  className="w-full h-32 object-cover transform scale-x-[-1]"
+                ></video>
+              ) : (
+                <div className="w-full h-32 flex items-center justify-center bg-gray-800 text-white text-4xl font-semibold rounded-md">
+                  {participant.name[0].toUpperCase()}
+                </div>
+              )}
+              {/* AUDIO CHANGE: Add audio element for each participant */}
+              <audio
+                ref={(audio) => {
+                  if (audio) {
+                    audioRefs.current[id] = audio;
+                  }
+                }}
+                autoPlay
+              />
+              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center">
+                <span className="text-sm font-semibold">
+                  {participant.name}
+                </span>
+                <button
+                  className="text-xs bg-gray-700 text-white px-2 py-1 rounded hover:bg-gray-600 transition"
+                  onClick={() => toggleParticipantMic(id)}
+                >
+                  {participant.mic ? (
+                    <FaMicrophone />
+                  ) : (
+                    <PiMicrophoneSlashLight />
+                  )}
+                </button>
+              </div>
+            </div>
+          ))}
+          {/* +X Indicator for Desktop */}
+          {remainingParticipantsDesktop > 0 && (
+            <div className="flex items-center justify-center w-full h-32 bg-black rounded-lg text-white text-2xl font-semibold cursor-pointer hover:bg-gray-600 transition">
+              {`+${remainingParticipantsMobile}`}
+            </div>
+          )}
         </div>
       )}
 

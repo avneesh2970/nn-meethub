@@ -61,14 +61,6 @@ io.on("connection", (socket) => {
         }
         console.log(" Join Meeting event (backend) userId: ", userId);
 
-        {/*const participant = meeting.participants.find((p) => p.user.toString() === userId.toString());
-        if (!participant || participant.status !== "joined") {
-            console.log("not allowed to join yet (backend)")
-
-            socket.emit("error", "Not allowed to join yet");
-            return;
-        }*/}
-
         // Notify all in the meeting about updated participants
         // io.to(meetingCode).emit("participantUpdate", meeting.participants);
 
@@ -96,13 +88,6 @@ io.on("connection", (socket) => {
         socket.on("streamUpdate", ({ userId, meetingCode, mic, video, screenSharing }) => {
             socket.to(meetingCode).emit("streamUpdate", { userId, mic, video, screenSharing });
         });
-
-        { /*
-        // WebRTC signaling
-        socket.on("signal", (data) => {
-            io.to(meetingCode).emit("signal", { userId, signal: data.signal });
-        });
-        */}
 
         socket.on("webrtc-offer", ({ to, from, offer, meetingCode }) => {
             console.log("webrtc-offer from", from, "to", to);
@@ -206,14 +191,6 @@ io.on("connection", (socket) => {
                         isSharing: true,
                     });
                     io.to(meetingCode).emit("streamUpdate", { userId, screenSharing: true });
-                    {/*io.to(meetingCode).emit("participantUpdate", {
-                        userId: participant.user,
-                        name: participant.name,
-                        status: participant.status,
-                        mic: participant.mic,
-                        video: participant.video,
-                        screenSharing: true,
-                    });*/}
                 }
             }
         });
@@ -231,14 +208,6 @@ io.on("connection", (socket) => {
                     });
 
                     io.to(meetingCode).emit("streamUpdate", { userId, screenSharing: false });
-                    {/*io.to(meetingCode).emit("participantUpdate", {
-                        userId: participant.user,
-                        name: participant.name,
-                        status: participant.status,
-                        mic: participant.mic,
-                        video: participant.video,
-                        screenSharing: false,
-                    });*/}
                 }
             }
         });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Video, Monitor, Calendar, Plus } from "lucide-react";
 
 import calendarHolder from "../assests/calendarHolder.png";

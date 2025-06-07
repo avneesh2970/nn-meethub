@@ -1,4 +1,3 @@
-import React from "react";
 import { Calendar, Clock, Video, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useMeetingStore } from "../store/useMeetingStore";

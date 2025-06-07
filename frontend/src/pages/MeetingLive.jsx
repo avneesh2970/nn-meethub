@@ -282,7 +282,7 @@ const MeetingLive = () => {
         console.error("Error playing localStream:", err);
       });
     }
-  }, [localStream, isScreenSharing, activeScreenSharer]);
+  }, [localStream, isScreenSharing, activeScreenSharer, isVideoOn]);
 
   useEffect(() => {
     if (screenStream && videoRef.current && isScreenSharing) {
@@ -349,13 +349,10 @@ const MeetingLive = () => {
     });
 
     socket.on("ice-candidate", (data) => {
-      console.log("ICE CANDIDATE in Meeting Live:", data);
-
       useMeetingStore.getState().handleIceCandidate(data);
     });
 
     socket.on("participant-left", ({ userId }) => {
-      console.log("PARTICIPANT LEFT in Meeting Live:", userId);
       useMeetingStore.getState().cleanupPeerConnection(userId);
     });
 
@@ -366,6 +363,17 @@ const MeetingLive = () => {
       socket.off("participant-left");
     };
   }, [socket]);
+
+  useEffect(() => {
+    const authUserId = authUser._id;
+    const participantState =
+      useMeetingStore.getState().participants[authUserId];
+    if (participantState) {
+      setIsMicOn(participantState.mic);
+      setIsVideoOn(participantState.video);
+      setIsScreenSharing(participantState.screenSharing || false);
+    }
+  }, [authUser, myStatus]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(meetingCode);
@@ -393,31 +401,85 @@ const MeetingLive = () => {
   // Callback to update videoRef after device switch
   const handleStreamUpdated = (newStream) => {
     if (videoRef.current) {
-      // Stop old tracks to prevent conflicts
-      if (videoRef.current.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+      if (isScreenSharing || activeScreenSharer) {
+        // Only update localStream, don't touch videoRef
+        setLocalStream(newStream);
+      } else {
+        // Stop old tracks to prevent conflicts
+        if (videoRef.current.srcObject) {
+          videoRef.current.srcObject
+            .getTracks()
+            .forEach((track) => track.stop());
+        }
+        setLocalStream(newStream);
+        videoRef.current.srcObject = newStream;
+        videoRef.current.play().catch((err) => {
+          console.error(
+            "Error playing local video after device switch for:",
+            err
+          );
+        });
       }
-      setLocalStream(newStream);
-      videoRef.current.srcObject = newStream;
-      videoRef.current.play().catch((err) => {
-        console.error("Error playing local video after device switch:", err);
-      });
     }
   };
 
-  const toggleMic = () => {
+  const toggleMic = async () => {
     console.log("TOGGLE MIC:", authUser._id);
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
+    if (!localStream) {
+      console.error("No localStream available to toggle mic");
+      return;
+    }
+
+    try {
+      let audioTrack = localStream.getAudioTracks()[0];
       console.log("Audio Track:", audioTrack);
-      audioTrack.enabled = !audioTrack.enabled;
+
+      if (!audioTrack) {
+        // Request a new audio track if none exists
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        audioTrack = audioStream.getAudioTracks()[0];
+        console.log("Added new audio track:", audioTrack);
+
+        // Add the new audio track to localStream
+        localStream.addTrack(audioTrack);
+
+        // Update the store's stream
+        useMeetingStore.getState().setLocalStream(authUser._id, localStream);
+
+        // Replace the audio track in all peer connections
+        const peerConnections = useMeetingStore.getState().peerConnections;
+        for (const participantId of Object.keys(peerConnections)) {
+          const peerConnection = peerConnections[participantId];
+          if (!peerConnection) continue;
+
+          const audioSender = peerConnection
+            .getSenders()
+            .find((sender) => sender.track?.kind === "audio");
+          if (audioSender) {
+            await audioSender.replaceTrack(audioTrack);
+            console.log(`Replaced audio track for ${participantId}`);
+          } else {
+            useMeetingStore.getState().queueRenegotiation(participantId);
+          }
+        }
+      }
+
+      // Toggle the audio track's enabled state
+      const newMicState = !isMicOn; // Determine the desired state
+      audioTrack.enabled = newMicState;
+      console.log(`Mic toggled to enabled=${audioTrack.enabled}`);
+
+      // Update local state and emit the toggle event
       setIsMicOn(audioTrack.enabled);
       socket.emit("toggleMic", {
         participantId: authUser._id,
-        mic: audioTrack.enabled,
+        mic: newMicState,
       });
-    } else {
-      console.error("No localStream available to toggle mic");
+    } catch (error) {
+      console.error("Error toggling mic:", error);
+      toast.error("Failed to toggle microphone: " + error.message);
     }
   };
 
@@ -426,6 +488,7 @@ const MeetingLive = () => {
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
       videoTrack.enabled = !videoTrack.enabled;
+      console.log("Video Track enabled STATE:", videoTrack.enabled);
       setIsVideoOn(videoTrack.enabled);
       socket.emit("toggleVideo", {
         participantId: authUser._id,
@@ -568,6 +631,7 @@ const MeetingLive = () => {
   };
 
   const toggleChat = () => {
+    console.log("TOGGLE CHAT", isChatOpen);
     setIsChatOpen((prev) => {
       if (!prev) setIsPeopleOpen(false);
       return !prev;
@@ -666,7 +730,7 @@ const MeetingLive = () => {
                   } transform scale-x-[-1]`}
                 ></video>
               </div>
-            ) : localStream ? (
+            ) : isVideoOn ? (
               <video
                 ref={videoRef}
                 autoPlay
@@ -692,7 +756,6 @@ const MeetingLive = () => {
             isChatOpen={isChatOpen}
             setIsChatOpen={setIsChatOpen}
             socket={socket}
-            selected={selected}
             setHasNewMessage={setHasNewMessage}
           />
           {/* People Section */}

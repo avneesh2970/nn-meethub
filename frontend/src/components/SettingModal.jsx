@@ -186,19 +186,6 @@ const SettingModal = ({
     };
   }, [isModalOpen, activeItem, streams, authUser._id]);
 
-  /* const handleVideoDeviceChange = async (deviceId) => {
-    setSelectedVideoDevice(deviceId);
-    if (switchDevice) {
-      try {
-        const newStream = await switchDevice("video", deviceId);
-        if (newStream && onStreamUpdate) {
-          onStreamUpdate(newStream);
-        }
-      } catch (err) {
-        console.error("Error switching video device:", err);
-      }
-    }
-  };*/
   const handleVideoDeviceChange = async (deviceId) => {
     setSelectedVideoDevice(deviceId);
     if (switchDevice) {
@@ -268,7 +255,7 @@ const SettingModal = ({
     >
       <div
         ref={modalContentRef}
-        className="flex flex-col md:flex-row items-center justify-center mt-8 w-50%"
+        className="flex flex-col md:flex-row items-center justify-center mt-8 w-full md:w-[50%]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Sidebar: Always visible on desktop, toggled on mobile */}
@@ -286,7 +273,7 @@ const SettingModal = ({
               <X size={20} />
             </button>
           </div>
-          <ul className="space-y-2 h-89">
+          <ul className="space-y-2 h-85">
             <li
               className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-800 rounded-lg"
               onClick={() => {
@@ -343,7 +330,7 @@ const SettingModal = ({
           </div>
 
           {activeItem === "Change Layout" && (
-            <div className="space-y-3 h-85">
+            <div className="space-y-3 h-85 w-full overflow-x-auto">
               {layouts.map((layout) => (
                 <label
                   key={layout.name}
@@ -367,13 +354,13 @@ const SettingModal = ({
           )}
 
           {activeItem === "Device Settings" && (
-            <div className="space-y-6 h-85">
+            <div className="space-y-6 h-85 w-full overflow-x-auto">
               <div>
                 <h3 className="text-sm font-medium mb-2">Video</h3>
-                <div className="flex items-center gap-2 bg-gray-800 text-white p-2 rounded-lg">
+                <div className="flex items-center gap-2 bg-gray-800 text-white p-2 rounded-lg min-w-0">
                   <IoVideocamOutline size={20} />
                   <select
-                    className="flex-1 max-w-[calc(100%-3rem)] bg-gray-800 text-white p-2 rounded-lg truncate"
+                    className="flex-1 max-w-[calc(100%-4rem)] bg-gray-800 text-white p-2 rounded-lg truncate"
                     value={selectedVideoDevice}
                     onChange={(e) => handleVideoDeviceChange(e.target.value)}
                   >
@@ -396,7 +383,7 @@ const SettingModal = ({
               </div>
               <div>
                 <h3 className="text-sm font-medium mb-2">Microphone</h3>
-                <div className="flex items-center gap-2 bg-gray-800 text-white p-2 rounded-lg mb-2">
+                <div className="flex items-center gap-2 bg-gray-800 text-white p-2 rounded-lg mb-2 min-w-0">
                   <IoMicOutline size={20} />
                   <select
                     className="flex-1 max-w-[calc(100%-3rem)] bg-gray-800 text-white p-2 rounded-lg truncate"
@@ -419,7 +406,7 @@ const SettingModal = ({
                     )}
                   </select>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <IoMicOutline size={20} />
                   <div className="flex-1 h-4 bg-gray-700 rounded-full overflow-hidden">
                     <div
@@ -431,31 +418,33 @@ const SettingModal = ({
               </div>
               <div>
                 <h3 className="text-sm font-medium mb-2">Speakers</h3>
-                <div className="flex flex-col sm:flex-row items-center gap-2 bg-gray-800 text-white p-2 rounded-lg sm:w-auto">
-                  <HiOutlineSpeakerWave size={20} />
-                  <select
-                    className="flex-1 max-w-[calc(100%-3rem)] sm:max-w-[calc(100%-7rem)] bg-gray-800 text-white p-2 rounded-lg truncate"
-                    value={selectedSpeakerDevice}
-                    onChange={(e) => setSelectedSpeakerDevice(e.target.value)}
-                  >
-                    {audioOutputDevices.length > 0 ? (
-                      audioOutputDevices.map((device) => (
-                        <option
-                          key={device.deviceId}
-                          value={device.deviceId}
-                          className="truncate"
-                        >
-                          {device.label ||
-                            `Speaker ${device.deviceId.slice(0, 5)}`}
-                        </option>
-                      ))
-                    ) : (
-                      <option>No speakers found</option>
-                    )}
-                  </select>
+                <div className="flex flex-col sm:flex-row items-center gap-2 bg-gray-800 text-white p-2 rounded-lg w-full min-w-0">
+                  <div className="flex items-center gap-2 w-full min-w-0">
+                    <HiOutlineSpeakerWave size={20} />
+                    <select
+                      className="flex-1 max-w-[calc(100%-3rem)] bg-gray-800 text-white p-2 rounded-lg truncate"
+                      value={selectedSpeakerDevice}
+                      onChange={(e) => setSelectedSpeakerDevice(e.target.value)}
+                    >
+                      {audioOutputDevices.length > 0 ? (
+                        audioOutputDevices.map((device) => (
+                          <option
+                            key={device.deviceId}
+                            value={device.deviceId}
+                            className="truncate"
+                          >
+                            {device.label ||
+                              `Speaker ${device.deviceId.slice(0, 5)}`}
+                          </option>
+                        ))
+                      ) : (
+                        <option>No speakers found</option>
+                      )}
+                    </select>
+                  </div>
 
                   <button
-                    className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2"
+                    className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2 w-full sm:w-auto"
                     onClick={testSpeaker}
                     disabled={isTestingSpeaker}
                   >
@@ -468,7 +457,7 @@ const SettingModal = ({
           )}
 
           {activeItem === "Host Tools" && (
-            <div className="space-y-6 h-85">
+            <div className="space-y-6 h-85 w-full overflow-x-auto">
               <p className="text-sm text-gray-400">
                 Allow all participants to:
               </p>

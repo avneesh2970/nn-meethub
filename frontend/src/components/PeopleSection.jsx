@@ -1,4 +1,3 @@
-import React from "react";
 import { X } from "lucide-react";
 import { FaMicrophone, FaVideo } from "react-icons/fa";
 import { PiMicrophoneSlashLight } from "react-icons/pi";
@@ -16,7 +15,7 @@ const PeopleSection = ({
 
   return (
     <div
-      className /*"w-full h-[100%] sm:w-[90%] lg:w-[25%] bg-white text-black shadow-lg flex flex-col lg:overflow-hidden fixed bottom-50% sm:bottom-auto sm:right-0 sm:rounded-t-lg lg:static"*/={`absolute top-0 right-0 w-full sm:w-[50%] lg:w-[20%] h-full bg-gray-900 text-white shadow-lg flex flex-col overflow-hidden transition-transform duration-300 transform ${
+      className={`absolute top-0 right-0 w-full sm:w-[50%] lg:w-[20%] h-full bg-gray-900 text-white shadow-lg flex flex-col overflow-hidden transition-transform duration-300 transform ${
         isPeopleOpen ? "translate-x-0" : "translate-x-full"
       } z-10`}
     >

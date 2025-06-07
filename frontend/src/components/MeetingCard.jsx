@@ -1,5 +1,3 @@
-import React from "react";
-
 const MeetingCard = ({ icon, title, onClick }) => {
   // Mapping for mobile-friendly titles
   const titleMapping = {

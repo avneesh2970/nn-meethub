@@ -170,11 +170,6 @@ export const useMeetingStore = create((set, get) => ({
             // Determine if this is video or audio track
             //const streamType = event.track.kind === 'video' ? 'video' : 'audio';
             const streamType = event.track.kind === 'video' && get().activeScreenSharer === participantId ? 'screen' : event.track.kind;
-            { /*const existingStream = get().streams[participantId]?.video || new MediaStream();
-            const track = event.track;
-            if (!existingStream.getTrackById(track.id)) {
-                existingStream.addTrack(track);
-            }*/}
 
             // Create a new MediaStream if one doesn't exist
             const stream = event.streams[0] || new MediaStream([event.track]);
@@ -481,15 +476,15 @@ export const useMeetingStore = create((set, get) => ({
 
                 newStream = await navigator.mediaDevices.getUserMedia({
                     video: { deviceId: deviceId },
-                    audio: micEnabled ? true : false,
+                    audio: true,
                 });
 
                 console.log(`Switched video device for ${authUserId} to ${deviceId}`);
 
                 // Ensure audio track is enabled if mic is supposed to be on
                 const newAudioTrack = newStream.getAudioTracks()[0];
-                if (newAudioTrack && micEnabled) {
-                    newAudioTrack.enabled = true;
+                if (newAudioTrack) {
+                    newAudioTrack.enabled = micEnabled;
                     console.log(`Ensured audio track is enabled after camera switch`);
                 }
 
@@ -514,7 +509,7 @@ export const useMeetingStore = create((set, get) => ({
                             get().queueRenegotiation(participantId);
                         }
 
-                        if (audioSender && newAudioTrack && micEnabled) {
+                        if (audioSender && newAudioTrack) {
                             await audioSender.replaceTrack(newAudioTrack);
                             console.log(`Successfully replaced audio track for ${participantId}`);
                         } else if (micEnabled && !audioSender) {
@@ -1176,14 +1171,6 @@ export const useMeetingStore = create((set, get) => ({
 
 
             console.log("toggleMic event received audioTrack:", audioTrack);
-            {/*set((state) => ({
-                streams: {
-                    ...state.streams,
-                    [participantId]: {
-                        ...state.streams[participantId], audio: audioTrack.enabled
-                    }
-                }
-            }));*/}
 
 
             set((state) => ({
@@ -1198,7 +1185,11 @@ export const useMeetingStore = create((set, get) => ({
                 if (peerConnection) {
                     const senders = peerConnection.getSenders();
                     const audioSender = senders.find(sender => sender.track?.kind === 'audio');
-                    if (audioSender && audioSender.track?.enabled !== mic) {
+                    if (!audioSender && vidAudioTrack && mic) {
+                        peerConnection.addTrack(vidAudioTrack, videoStream);
+                        console.log(`Added audio track to peer connection for ${participantId}`);
+                        get().queueRenegotiation(participantId);
+                    } else if (audioSender && audioSender.track?.enabled !== mic) {
                         console.log(`Queuing renegotiation for ${participantId} due to mic state change`);
                         get().queueRenegotiation(participantId);
                     }
@@ -1261,9 +1252,7 @@ export const useMeetingStore = create((set, get) => ({
 
             if (mic !== undefined && newStreams[userId]?.video) {
                 let audioTrack = newStreams[userId].video.getAudioTracks()[0];
-                /*if (audioTrack) {
-                    audioTrack.enabled = mic;
-                }*/
+
                 if (!audioTrack && mic) {
                     // Audio track is missing but mic should be on, re-request audio
                     try {

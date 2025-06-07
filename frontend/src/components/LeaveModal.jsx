@@ -1,5 +1,3 @@
-import React from "react";
-
 const LeaveModal = ({ isLeaveModalOpen, closeLeaveModal, handleSignOut }) => {
   if (!isLeaveModalOpen) return null;
 
