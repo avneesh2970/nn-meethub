@@ -474,6 +474,8 @@ export const useMeetingStore = create((set, get) => ({
                 const micEnabled = participants[authUserId]?.mic ?? false;
                 //const audioDeviceId = currentStream.getAudioTracks()[0]?.getSettings().deviceId;
 
+                const videoEnabled = participants[authUserId]?.video ?? false;
+
                 newStream = await navigator.mediaDevices.getUserMedia({
                     video: { deviceId: deviceId },
                     audio: true,
@@ -489,6 +491,14 @@ export const useMeetingStore = create((set, get) => ({
                 }
 
                 const newVideoTrack = newStream.getVideoTracks()[0];
+
+                if (newVideoTrack) {
+                    newVideoTrack.enabled = videoEnabled;
+                    console.log(`Set video track enabled state to ${videoEnabled} after camera switch`);
+                    // Debug log to confirm track state
+                    console.log(`New video track state: enabled=${newVideoTrack.enabled}, readyState=${newVideoTrack.readyState}`);
+                }
+
                 let replaceTrackSuccess = true;
 
                 for (const participantId of Object.keys(peerConnections)) {

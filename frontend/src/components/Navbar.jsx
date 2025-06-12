@@ -1,4 +1,4 @@
-import logo from "../assests/logo.svg";
+import logo from "../assests/logo.png";
 import { useAuthStore } from "../store/useAuthStore";
 import { LogOut, User } from "lucide-react";
 const Navbar = () => {
@@ -7,7 +7,11 @@ const Navbar = () => {
   return (
     <header className="bg-base-100 border-b border-base-300 fixed w-full top-0 z-40 backdrop-blur-lg bg-base-100/80">
       <nav className=" flex items-center justify-between p-5 bg-black">
-        <img src={logo} alt="Logo" className="h-6 w-auto" />
+        <img
+          src={logo}
+          alt="Logo"
+          className="h-8 w-auto rounded-2xl bg-amber-50"
+        />
         {authUser && (
           <div className="flex items-center gap-5">
             <div className={`flex items-center gap-1`}>

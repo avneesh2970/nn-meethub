@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import logo from "../assests/logo.svg";
+import logo from "../assests/logo.png";
 import Frame1 from "../assests/Frame 1424.png";
 import Frame2 from "../assests/Frame 1414.png";
 import Frame3 from "../assests/Frame 1415.png";
@@ -16,11 +16,13 @@ import { toast } from "react-hot-toast";
 
 import { useAuthStore } from "../store/useAuthStore";
 import { useMeetingStore } from "../store/useMeetingStore";
+import { useDeviceStore } from "../components/SettingModal";
 
 const MeetingLive = () => {
   const { socket, authUser } = useAuthStore();
   const [copied, setCopied] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  const { selectedVideoDevice } = useDeviceStore();
 
   const navigate = useNavigate();
   const {
@@ -488,7 +490,18 @@ const MeetingLive = () => {
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
       videoTrack.enabled = !videoTrack.enabled;
+      if (videoTrack.readyState === "ended") {
+        if (!selectedVideoDevice) {
+          console.error("No selected video device found in useDeviceStore");
+          return;
+        }
+        setLocalStream(streams[authUser._id]?.video || null);
+      }
       console.log("Video Track enabled STATE:", videoTrack.enabled);
+      console.log(
+        "Video Track readyState after toggle:",
+        videoTrack.readyState
+      );
       setIsVideoOn(videoTrack.enabled);
       socket.emit("toggleVideo", {
         participantId: authUser._id,
@@ -675,7 +688,11 @@ const MeetingLive = () => {
       <div className={`relative ${isModalOpen ? "blur-sm" : ""}`}>
         <div className="bg-black text-white flex flex-wrap items-center justify-between px-4 py-2 w-full h-14">
           <nav className="flex items-center p-2 sm:p-4">
-            <img src={logo} alt="Company Logo" className="h-6 w-auto" />
+            <img
+              src={logo}
+              alt="Company Logo"
+              className="h-6 w-auto rounded-2xl bg-amber-50"
+            />
           </nav>
           <div className="flex items-center gap-2 text-sm justify-center flex-1">
             <span className="text-gray-400 truncate max-w-[100px] sm:max-w-none">

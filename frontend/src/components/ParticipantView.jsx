@@ -66,7 +66,7 @@ const ParticipantView = ({
         console.log(`Assigning stream for ${id}:`, videoStream);
         videoElement.pause();
         videoElement.srcObject = videoStream;
-        videoRefs.current[id].muted = true; // 11-05-2025 NEW CHANGE FOR UNMUTE
+        videoRefs.current[id].muted = true;
         videoElement.load();
         videoElement.play().catch((err) => {
           console.error(`Error playing video for ${id}:`, err);
@@ -154,9 +154,9 @@ const ParticipantView = ({
             return (
               <div
                 key={id}
-                className={`relative ${mobileVideoWidthClass} h-[22vh] aspect-video rounded-lg overflow-hidden1`}
+                className={`relative ${mobileVideoWidthClass} h-[22vh] aspect-video rounded-lg overflow-hidden bg-gray-800`}
               >
-                {streams[id]?.video ? (
+                {streams[id]?.video && (
                   <video
                     ref={(video) => {
                       if (video) {
@@ -167,8 +167,9 @@ const ParticipantView = ({
                     muted
                     className="w-full h-full object-cover transform scale-x-[-1]"
                   ></video>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-800 text-white text-4xl font-semibold rounded-md">
+                )}
+                {!participant.video && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-800 text-white text-4xl font-semibold rounded-md">
                     {participant.name[0].toUpperCase()}
                   </div>
                 )}

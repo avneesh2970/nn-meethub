@@ -7,7 +7,7 @@ import { persist } from "zustand/middleware";
 import { useAuthStore } from "../store/useAuthStore";
 import { useMeetingStore } from "../store/useMeetingStore";
 
-const useDeviceStore = create(
+export const useDeviceStore = create(
   persist(
     (set) => ({
       selectedVideoDevice: "",
